@@ -1,4 +1,4 @@
-<script>
+<script lang='ts'>
 	import { Button } from '$lib/components/ui/button/index';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index';
 	import { Toaster } from '$lib/components/ui/sonner';
@@ -7,13 +7,15 @@
 	import { ModeWatcher } from 'mode-watcher';
 	import '../app.css';
 	import { page } from '$app/stores';
+	import { base } from '$app/paths';
 
 	import { resetMode, setMode } from 'mode-watcher';
 
-	const routes = {
-		'/': 'Home',
-		'/merge': 'Merge/Convert'
-	};
+	let routes: Record<string, string> = {};
+	routes[`${base}/`] = 'Home';
+	routes[`${base}/merge/`] = 'Merge/Convert';
+
+	console.log('path is: ', $page.url.pathname);
 </script>
 
 <ModeWatcher />
@@ -21,7 +23,7 @@
 <nav class="flex justify-between">
 	<ul class="inline-flex space-x-4 items-center ml-8">
 		{#each Object.entries(routes) as [route, name]}
-			{#if $page.url.pathname.endsWith(route)}
+			{#if $page.url.pathname == route}
 				<li
 					class="flex text-center bg-background text-foreground text-xl font-semibold px-4 w-fit border-b-2 border-foreground h-12 items-center"
 				>
