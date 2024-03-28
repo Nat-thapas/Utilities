@@ -14,8 +14,6 @@
 	let routes: Record<string, string> = {};
 	routes[`${base}/`] = 'Home';
 	routes[`${base}/merge/`] = 'Merge/Convert';
-
-	console.log('path is: ', $page.url.pathname);
 </script>
 
 <ModeWatcher />

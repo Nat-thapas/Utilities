@@ -316,7 +316,7 @@
 <div class="grid w-full max-w-sm items-center gap-1.5 mx-auto mt-4">
 	<h1 class="text-xl font-semibold">Merge/Convert</h1>
 	<hr />
-	<h2 class="mb-4">Merge PDF or image files into one PDF file</h2>
+	<h2 class="mb-1">Merge PDF or image files into one PDF file</h2>
 	<Label for="input-files">Input files</Label>
 	<input
 		id="input-files"
@@ -369,19 +369,19 @@
 	<Label for="output-size">Output {scaleDimension.label.toLowerCase()}</Label>
 	<div class="flex">
 		<div
-			class="flex h-[2.625rem] mr-2 rounded-md border border-input bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+			class="flex h-10 mr-2 rounded-md border border-input bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 		>
 			<Input
 				type="number"
 				id="output-size"
-				class="border-0"
+				class="border-0 h-[2.375rem] mr-1"
 				placeholder="Output size"
 				bind:value={outputSize}
 				on:change={removePresetSize}
 			/>
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger asChild let:builder>
-					<Button variant="secondary" builders={[builder]}>Presets</Button>
+					<Button variant="secondary" class="h-[2.375rem]" builders={[builder]}>Presets</Button>
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Content class="w-32">
 					<DropdownMenu.Label>Preset sizes</DropdownMenu.Label>
