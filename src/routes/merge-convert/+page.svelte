@@ -317,7 +317,7 @@
 </script>
 
 <svelte:head>
-	<title>Merge/Convert</title>
+	<title>Merge/Convert to PDF</title>
 </svelte:head>
 
 <div class="grid w-full max-w-sm items-center gap-1.5 mx-auto mt-4">

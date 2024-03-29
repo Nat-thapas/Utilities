@@ -13,7 +13,8 @@
 
 	let routes: Record<string, string> = {};
 	routes[`${base}/`] = 'Home';
-	routes[`${base}/merge/`] = 'Merge/Convert';
+	routes[`${base}/merge-convert/`] = 'Merge/Convert to PDF';
+	routes[`${base}/decrypt/`] = 'Decrypt PDF';
 </script>
 
 <ModeWatcher />
