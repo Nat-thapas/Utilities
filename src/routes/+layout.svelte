@@ -59,6 +59,6 @@
 </nav>
 <hr />
 
-<Toaster />
+<Toaster richColors closeButton />
 
 <slot />

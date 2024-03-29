@@ -5,6 +5,7 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Progress } from '$lib/components/ui/progress';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import Download from 'lucide-svelte/icons/download';
 	import LoaderCircle from 'lucide-svelte/icons/loader-circle';
 	import { PDFDocument } from 'pdf-lib';
 	import { toast } from 'svelte-sonner';
@@ -153,9 +154,12 @@
 	let files: FileList;
 	let progressPrecent = 0;
 	let processing = false;
+	let downloadUrl: string = '';
 
 	async function mergeFiles() {
 		processing = true;
+		URL.revokeObjectURL(downloadUrl);
+		downloadUrl = '';
 
 		const mergedPDF = await PDFDocument.create();
 
@@ -195,7 +199,7 @@
 							height: height
 						});
 					} catch (error) {
-						toast.error(`Failed to embed image: ${file.name}`, {
+						toast.warning(`Failed to embed image: ${file.name}`, {
 							description: 'Unknown error, this file was skipped'
 						});
 					}
@@ -230,7 +234,7 @@
 							height: height
 						});
 					} catch (error) {
-						toast.error(`Failed to embed image: ${file.name}`, {
+						toast.warning(`Failed to embed image: ${file.name}`, {
 							description: 'Unknown error, this file was skipped'
 						});
 					}
@@ -268,7 +272,7 @@
 								((pageIndex + 1) * progressPrecentPerFile) / pageCount;
 						}
 					} catch (error) {
-						toast.error(`Failed to load PDF: ${file.name}`, {
+						toast.warning(`Failed to load PDF: ${file.name}`, {
 							description:
 								error instanceof Error && error.message.includes('is encrypted')
 									? 'Document is encrypted, this file was skipped'
@@ -278,7 +282,7 @@
 					break;
 
 				default:
-					toast.error(`Unsupported file type: ${file.name}`, {
+					toast.warning(`Unsupported file type: ${file.name}`, {
 						description: `File type ${file.type} is not supported, this file was skipped`
 					});
 					break;
@@ -296,13 +300,16 @@
 			return;
 		}
 		const mergedPdf = await mergedPDF.save();
-		const blob = new Blob([mergedPdf], { type: 'application/pdf' });
-		const url = URL.createObjectURL(blob);
+		const mergedPdfBlob = new Blob([mergedPdf], { type: 'application/pdf' });
+		downloadUrl = URL.createObjectURL(mergedPdfBlob);
+		toast.success('Processing completed!', {
+			description:
+				'Your file should begin downloading automatically. If not, click the download button'
+		});
 		const a = document.createElement('a');
-		a.href = url;
+		a.href = downloadUrl;
 		a.download = 'output.pdf';
 		a.click();
-		URL.revokeObjectURL(url);
 
 		progressPrecent = 100;
 		processing = false;
@@ -421,5 +428,10 @@
 			<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
 			Processing: {progressPrecent.toFixed(0)}%
 		</Button>
+	{/if}
+	{#if downloadUrl}
+		<a href={downloadUrl} class="w-full h-fit" download="output.pdf">
+			<Button variant="secondary" class="w-full"><Download class="mr-2 h-4 w-4" />Download</Button>
+		</a>
 	{/if}
 </div>
