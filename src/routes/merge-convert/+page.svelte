@@ -320,7 +320,7 @@
 	<title>Merge/Convert to PDF</title>
 </svelte:head>
 
-<div class="grid w-full max-w-sm items-center gap-1.5 mx-auto mt-4">
+<div class="grid w-[22rem] items-center gap-1.5 mx-auto mt-4 px-4">
 	<h1 class="text-xl font-semibold">Merge/Convert</h1>
 	<hr />
 	<h2 class="mb-1">Merge PDF or image files into one PDF file</h2>
@@ -338,7 +338,7 @@
 		<div>
 			<Label for="scale-type">Scale</Label>
 			<Select.Root bind:selected={scaleType}>
-				<Select.Trigger class="w-[180px]">
+				<Select.Trigger class="w-36">
 					<Select.Value placeholder="Scale type" />
 				</Select.Trigger>
 				<Select.Content>
@@ -355,7 +355,7 @@
 		<div>
 			<Label for="scale-dimension">Dimension</Label>
 			<Select.Root bind:selected={scaleDimension}>
-				<Select.Trigger class="w-[180px]">
+				<Select.Trigger class="w-40">
 					<Select.Value placeholder="Scale dimension" />
 				</Select.Trigger>
 				<Select.Content>
@@ -404,7 +404,7 @@
 			</DropdownMenu.Root>
 		</div>
 		<Select.Root bind:selected={outputSizeUnit}>
-			<Select.Trigger class="w-[180px]">
+			<Select.Trigger class="w-48">
 				<Select.Value placeholder="Unit" />
 			</Select.Trigger>
 			<Select.Content>
