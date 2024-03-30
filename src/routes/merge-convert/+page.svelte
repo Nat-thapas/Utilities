@@ -1,27 +1,23 @@
 <script lang="ts">
-	// @hmr:keep-all
-
+	import SortableList from '$lib/components/ui/SortableList.svelte';
+	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Progress } from '$lib/components/ui/progress';
 	import * as Select from '$lib/components/ui/select/index.js';
+	import { Separator } from '$lib/components/ui/separator/index.js';
+	import ArrowDown from 'lucide-svelte/icons/arrow-down';
+	import ArrowDownToLine from 'lucide-svelte/icons/arrow-down-to-line';
+	import ArrowUp from 'lucide-svelte/icons/arrow-up';
+	import ArrowUpToLine from 'lucide-svelte/icons/arrow-up-to-line';
 	import Download from 'lucide-svelte/icons/download';
+	import EllipsisVertical from 'lucide-svelte/icons/ellipsis-vertical';
 	import LoaderCircle from 'lucide-svelte/icons/loader-circle';
+	import Trash2 from 'lucide-svelte/icons/trash-2';
 	import { PDFDocument } from 'pdf-lib';
 	import { toast } from 'svelte-sonner';
-	import SortableList from '$lib/components/ui/SortableList.svelte';
-	import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
-	import { Separator } from '$lib/components/ui/separator/index.js';
-	import * as Avatar from '$lib/components/ui/avatar/index.js';
-	import ChevronsUpDown from 'lucide-svelte/icons/chevrons-up-down';
-	import ArrowUp from 'lucide-svelte/icons/arrow-up';
-	import ArrowDown from 'lucide-svelte/icons/arrow-down';
-	import ArrowUpToLine from 'lucide-svelte/icons/arrow-up-to-line';
-	import ArrowDownToLine from 'lucide-svelte/icons/arrow-down-to-line';
-	import Trash2 from 'lucide-svelte/icons/trash-2';
-	import EllipsisVertical from 'lucide-svelte/icons/ellipsis-vertical';
 
 	const scaleTypes = [
 		{ value: 'all', label: 'All pages' },
@@ -407,7 +403,7 @@
 <div class="flex flex-wrap w-full justify-center">
 	<div class="grid w-[22rem] h-fit items-center gap-1.5 mt-4 px-4">
 		<h1 class="text-xl font-semibold">Merge/Convert</h1>
-		<hr />
+		<Separator />
 		<h2 class="mb-1">Merge PDF or image files into one PDF file</h2>
 		<Label for="input-files">Input files</Label>
 		<input
