@@ -1,641 +1,221 @@
 <script lang="ts">
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
+	import { Progress } from '$lib/components/ui/progress';
+	import { Separator } from '$lib/components/ui/separator/index.js';
+	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import { Go, initGo, stdout_stderr } from '$lib/wasm_exec';
 	import * as BrowserFS from 'browserfs';
-
-	function initGo(fs, Buffer) {
-		if (typeof global !== 'undefined') {
-			// global already exists
-		} else if (typeof window !== 'undefined') {
-			window.global = window;
-		} else if (typeof self !== 'undefined') {
-			self.global = self;
-		} else {
-			throw new Error('cannot export Go (neither global, window nor self is defined)');
-		}
-
-		var handler = {
-			get: function (target, property) {
-				if (property in target && target[property] instanceof Function) {
-					return function () {
-						console.log(property, 'called', arguments);
-						if (arguments[arguments.length - 1] instanceof Function) {
-							var origCB = arguments[arguments.length - 1];
-							var newCB = function () {
-								console.log('callback for', property, 'get called with args:', arguments);
-								return Reflect.apply(origCB, arguments.callee, arguments);
-							};
-							arguments[arguments.length - 1] = newCB;
-						}
-						return Reflect.apply(target[property], target, arguments);
-					};
-				} else {
-					return target[property];
-				}
-			}
-		};
-
-		// Map web browser API and Node.js API to a single common API (preferring web standards over Node.js API).
-		const isNodeJS = global.process && global.process.title === 'node';
-		if (isNodeJS) {
-			global.require = require;
-			global.fs = require('fs');
-			// global.fs = new Proxy(require("fs"), handler);
-
-			const nodeCrypto = require('crypto');
-			global.crypto = {
-				getRandomValues(b) {
-					nodeCrypto.randomFillSync(b);
-				}
-			};
-
-			global.performance = {
-				now() {
-					const [sec, nsec] = process.hrtime();
-					return sec * 1000 + nsec / 1000000;
-				}
-			};
-
-			const util = require('util');
-			global.TextEncoder = util.TextEncoder;
-			global.TextDecoder = util.TextDecoder;
-		} else {
-			global.Buffer = Buffer;
-			global.fs = fs;
-			global.fs.constants = {
-				O_RDONLY: 0,
-				O_WRONLY: 1,
-				O_RDWR: 2,
-				O_CREAT: 64,
-				O_EXCL: 128,
-				O_NOCTTY: 256,
-				O_TRUNC: 512,
-				O_APPEND: 1024,
-				O_DIRECTORY: 65536,
-				O_NOATIME: 262144,
-				O_NOFOLLOW: 131072,
-				O_SYNC: 1052672,
-				O_DIRECT: 16384,
-				O_NONBLOCK: 2048
-			};
-
-			let outputBuf = '';
-
-			global.fs.writeSyncOriginal = global.fs.writeSync;
-			global.fs.writeSync = function (fd, buf) {
-				if (fd === 1 || fd === 2) {
-					outputBuf += decoder.decode(buf);
-					const nl = outputBuf.lastIndexOf('\n');
-					if (nl != -1) {
-						console.log(outputBuf.substr(0, nl));
-						outputBuf = outputBuf.substr(nl + 1);
-					}
-					return buf.length;
-				} else {
-					return global.fs.writeSyncOriginal(...arguments);
-				}
-			};
-
-			global.fs.writeOriginal = global.fs.write;
-			global.fs.write = function (fd, buf, offset, length, position, callback) {
-				if (fd === 1 || fd === 2) {
-					if (offset !== 0 || length !== buf.length || position !== null) {
-						throw new Error('not implemented');
-					}
-					const n = this.writeSync(fd, buf);
-					callback(null, n, buf);
-				} else {
-					// buf:
-					arguments[1] = global.Buffer.from(arguments[1]);
-					return global.fs.writeOriginal(...arguments);
-				}
-			};
-
-			global.fs.openOriginal = global.fs.open;
-			global.fs.open = function (path, flags, mode, callback) {
-				var myflags = 'r';
-				var O = global.fs.constants;
-
-				// Convert numeric flags to string flags
-				// FIXME: maybe wrong...
-				if (flags & O.O_WRONLY) {
-					// 'w'
-					myflags = 'w';
-					if (flags & O.O_EXCL) {
-						myflags = 'wx';
-					}
-				} else if (flags & O.O_RDWR) {
-					// 'r+' or 'w+'
-					if (flags & O.O_CREAT && flags & O.O_TRUNC) {
-						// w+
-						if (flags & O.O_EXCL) {
-							myflags = 'wx+';
-						} else {
-							myflags = 'w+';
-						}
-					} else {
-						// r+
-						myflags = 'r+';
-					}
-				} else if (flags & O.O_APPEND) {
-					// 'a'
-					throw new Error('Not implmented');
-				}
-				// TODO: handle other cases
-
-				return global.fs.openOriginal(path, myflags, mode, callback);
-			};
-
-			global.fs.fstatOriginal = global.fs.fstat;
-			global.fs.fstat = function (fd, callback) {
-				return global.fs.fstatOriginal(fd, function () {
-					var retStat = arguments[1];
-					delete retStat['fileData'];
-					retStat.atimeMs = retStat.atime.getTime();
-					retStat.mtimeMs = retStat.mtime.getTime();
-					retStat.ctimeMs = retStat.ctime.getTime();
-					retStat.birthtimeMs = retStat.birthtime.getTime();
-					return callback(arguments[0], retStat);
-				});
-			};
-
-			global.fs.closeOriginal = global.fs.close;
-			global.fs.close = function (fd, callback) {
-				return global.fs.closeOriginal(fd, function () {
-					if (typeof arguments[0] === 'undefined') arguments[0] = null;
-					return callback(...arguments);
-				});
-			};
-
-			// global.fs = new Proxy(global.fs, handler); // <- "install" the handler for proxy;
-
-			/*
-			open(path, flags, mode, callback) {
-				const err = new Error("not implemented");
-				err.code = "ENOSYS";
-				callback(err);
-			},
-			read(fd, buffer, offset, length, position, callback) {
-				const err = new Error("not implemented");
-				err.code = "ENOSYS";
-				callback(err);
-			},
-			fsync(fd, callback) {
-				callback(null);
-			},
-		};
-		*/
-		}
-
-		const encoder = new TextEncoder('utf-8');
-		const decoder = new TextDecoder('utf-8');
-
-		global.Go = class {
-			constructor() {
-				this.argv = ['js'];
-				this.env = {};
-				this.exit = (code) => {
-					this.exitCode = code;
-					if (code !== 0) {
-						console.warn('exit code:', code);
-					}
-				};
-				this._exitPromise = new Promise((resolve) => {
-					this._resolveExitPromise = resolve;
-				});
-				this._pendingEvent = null;
-				this._scheduledTimeouts = new Map();
-				this._nextCallbackTimeoutID = 1;
-
-				const mem = () => {
-					// The buffer may change when requesting more memory.
-					return new DataView(this._inst.exports.mem.buffer);
-				};
-
-				const setInt64 = (addr, v) => {
-					mem().setUint32(addr + 0, v, true);
-					mem().setUint32(addr + 4, Math.floor(v / 4294967296), true);
-				};
-
-				const getInt64 = (addr) => {
-					const low = mem().getUint32(addr + 0, true);
-					const high = mem().getInt32(addr + 4, true);
-					return low + high * 4294967296;
-				};
-
-				const loadValue = (addr) => {
-					const f = mem().getFloat64(addr, true);
-					if (f === 0) {
-						return undefined;
-					}
-					if (!isNaN(f)) {
-						return f;
-					}
-
-					const id = mem().getUint32(addr, true);
-					return this._values[id];
-				};
-
-				const storeValue = (addr, v) => {
-					const nanHead = 0x7ff80000;
-
-					if (typeof v === 'number') {
-						if (isNaN(v)) {
-							mem().setUint32(addr + 4, nanHead, true);
-							mem().setUint32(addr, 0, true);
-							return;
-						}
-						if (v === 0) {
-							mem().setUint32(addr + 4, nanHead, true);
-							mem().setUint32(addr, 1, true);
-							return;
-						}
-						mem().setFloat64(addr, v, true);
-						return;
-					}
-
-					switch (v) {
-						case undefined:
-							mem().setFloat64(addr, 0, true);
-							return;
-						case null:
-							mem().setUint32(addr + 4, nanHead, true);
-							mem().setUint32(addr, 2, true);
-							return;
-						case true:
-							mem().setUint32(addr + 4, nanHead, true);
-							mem().setUint32(addr, 3, true);
-							return;
-						case false:
-							mem().setUint32(addr + 4, nanHead, true);
-							mem().setUint32(addr, 4, true);
-							return;
-					}
-
-					let ref = this._refs.get(v);
-					if (ref === undefined) {
-						ref = this._values.length;
-						this._values.push(v);
-						this._refs.set(v, ref);
-					}
-					let typeFlag = 0;
-					switch (typeof v) {
-						case 'string':
-							typeFlag = 1;
-							break;
-						case 'symbol':
-							typeFlag = 2;
-							break;
-						case 'function':
-							typeFlag = 3;
-							break;
-					}
-					mem().setUint32(addr + 4, nanHead | typeFlag, true);
-					mem().setUint32(addr, ref, true);
-				};
-
-				const loadSlice = (addr) => {
-					const array = getInt64(addr + 0);
-					const len = getInt64(addr + 8);
-					return new Uint8Array(this._inst.exports.mem.buffer, array, len);
-				};
-
-				const loadSliceOfValues = (addr) => {
-					const array = getInt64(addr + 0);
-					const len = getInt64(addr + 8);
-					const a = new Array(len);
-					for (let i = 0; i < len; i++) {
-						a[i] = loadValue(array + i * 8);
-					}
-					return a;
-				};
-
-				const loadString = (addr) => {
-					const saddr = getInt64(addr + 0);
-					const len = getInt64(addr + 8);
-					return decoder.decode(new DataView(this._inst.exports.mem.buffer, saddr, len));
-				};
-
-				const timeOrigin = Date.now() - performance.now();
-				this.importObject = {
-					go: {
-						// Go's SP does not change as long as no Go code is running. Some operations (e.g. calls, getters and setters)
-						// may synchronously trigger a Go event handler. This makes Go code get executed in the middle of the imported
-						// function. A goroutine can switch to a new stack if the current stack is too small (see morestack function).
-						// This changes the SP, thus we have to update the SP used by the imported function.
-
-						// func wasmExit(code int32)
-						'runtime.wasmExit': (sp) => {
-							const code = mem().getInt32(sp + 8, true);
-							this.exited = true;
-							delete this._inst;
-							delete this._values;
-							delete this._refs;
-							this.exit(code);
-						},
-
-						// func wasmWrite(fd uintptr, p unsafe.Pointer, n int32)
-						'runtime.wasmWrite': (sp) => {
-							const fd = getInt64(sp + 8);
-							const p = getInt64(sp + 16);
-							const n = mem().getInt32(sp + 24, true);
-							fs.writeSync(fd, new Uint8Array(this._inst.exports.mem.buffer, p, n));
-						},
-
-						// func nanotime() int64
-						'runtime.nanotime': (sp) => {
-							setInt64(sp + 8, (timeOrigin + performance.now()) * 1000000);
-						},
-
-						// func walltime() (sec int64, nsec int32)
-						'runtime.walltime': (sp) => {
-							const msec = new Date().getTime();
-							setInt64(sp + 8, msec / 1000);
-							mem().setInt32(sp + 16, (msec % 1000) * 1000000, true);
-						},
-
-						// func scheduleTimeoutEvent(delay int64) int32
-						'runtime.scheduleTimeoutEvent': (sp) => {
-							const id = this._nextCallbackTimeoutID;
-							this._nextCallbackTimeoutID++;
-							this._scheduledTimeouts.set(
-								id,
-								setTimeout(
-									() => {
-										this._resume();
-									},
-									getInt64(sp + 8) + 1 // setTimeout has been seen to fire up to 1 millisecond early
-								)
-							);
-							mem().setInt32(sp + 16, id, true);
-						},
-
-						// func clearTimeoutEvent(id int32)
-						'runtime.clearTimeoutEvent': (sp) => {
-							const id = mem().getInt32(sp + 8, true);
-							clearTimeout(this._scheduledTimeouts.get(id));
-							this._scheduledTimeouts.delete(id);
-						},
-
-						// func getRandomData(r []byte)
-						'runtime.getRandomData': (sp) => {
-							crypto.getRandomValues(loadSlice(sp + 8));
-						},
-
-						// func stringVal(value string) ref
-						'syscall/js.stringVal': (sp) => {
-							storeValue(sp + 24, loadString(sp + 8));
-						},
-
-						// func valueGet(v ref, p string) ref
-						'syscall/js.valueGet': (sp) => {
-							const result = Reflect.get(loadValue(sp + 8), loadString(sp + 16));
-							sp = this._inst.exports.getsp(); // see comment above
-							storeValue(sp + 32, result);
-						},
-
-						// func valueSet(v ref, p string, x ref)
-						'syscall/js.valueSet': (sp) => {
-							Reflect.set(loadValue(sp + 8), loadString(sp + 16), loadValue(sp + 32));
-						},
-
-						// func valueIndex(v ref, i int) ref
-						'syscall/js.valueIndex': (sp) => {
-							storeValue(sp + 24, Reflect.get(loadValue(sp + 8), getInt64(sp + 16)));
-						},
-
-						// valueSetIndex(v ref, i int, x ref)
-						'syscall/js.valueSetIndex': (sp) => {
-							Reflect.set(loadValue(sp + 8), getInt64(sp + 16), loadValue(sp + 24));
-						},
-
-						// func valueCall(v ref, m string, args []ref) (ref, bool)
-						'syscall/js.valueCall': (sp) => {
-							try {
-								const v = loadValue(sp + 8);
-								const m = Reflect.get(v, loadString(sp + 16));
-								const args = loadSliceOfValues(sp + 32);
-								const result = Reflect.apply(m, v, args);
-								sp = this._inst.exports.getsp(); // see comment above
-								storeValue(sp + 56, result);
-								mem().setUint8(sp + 64, 1);
-							} catch (err) {
-								storeValue(sp + 56, err);
-								mem().setUint8(sp + 64, 0);
-							}
-						},
-
-						// func valueInvoke(v ref, args []ref) (ref, bool)
-						'syscall/js.valueInvoke': (sp) => {
-							try {
-								const v = loadValue(sp + 8);
-								const args = loadSliceOfValues(sp + 16);
-								const result = Reflect.apply(v, undefined, args);
-								sp = this._inst.exports.getsp(); // see comment above
-								storeValue(sp + 40, result);
-								mem().setUint8(sp + 48, 1);
-							} catch (err) {
-								storeValue(sp + 40, err);
-								mem().setUint8(sp + 48, 0);
-							}
-						},
-
-						// func valueNew(v ref, args []ref) (ref, bool)
-						'syscall/js.valueNew': (sp) => {
-							try {
-								const v = loadValue(sp + 8);
-								const args = loadSliceOfValues(sp + 16);
-								const result = Reflect.construct(v, args);
-								sp = this._inst.exports.getsp(); // see comment above
-								storeValue(sp + 40, result);
-								mem().setUint8(sp + 48, 1);
-							} catch (err) {
-								storeValue(sp + 40, err);
-								mem().setUint8(sp + 48, 0);
-							}
-						},
-
-						// func valueLength(v ref) int
-						'syscall/js.valueLength': (sp) => {
-							setInt64(sp + 16, parseInt(loadValue(sp + 8).length));
-						},
-
-						// valuePrepareString(v ref) (ref, int)
-						'syscall/js.valuePrepareString': (sp) => {
-							const str = encoder.encode(String(loadValue(sp + 8)));
-							storeValue(sp + 16, str);
-							setInt64(sp + 24, str.length);
-						},
-
-						// valueLoadString(v ref, b []byte)
-						'syscall/js.valueLoadString': (sp) => {
-							const str = loadValue(sp + 8);
-							loadSlice(sp + 16).set(str);
-						},
-
-						// func valueInstanceOf(v ref, t ref) bool
-						'syscall/js.valueInstanceOf': (sp) => {
-							mem().setUint8(sp + 24, loadValue(sp + 8) instanceof loadValue(sp + 16));
-						},
-
-						debug: (value) => {
-							console.log(value);
-						}
-					}
-				};
-			}
-
-			async run(instance) {
-				this._inst = instance;
-				this._values = [
-					// TODO: garbage collection
-					NaN,
-					0,
-					null,
-					true,
-					false,
-					global,
-					this._inst.exports.mem,
-					this
-				];
-				this._refs = new Map();
-				this.exited = false;
-
-				const mem = new DataView(this._inst.exports.mem.buffer);
-
-				// Pass command line arguments and environment variables to WebAssembly by writing them to the linear memory.
-				let offset = 4096;
-
-				const strPtr = (str) => {
-					let ptr = offset;
-					new Uint8Array(mem.buffer, offset, str.length + 1).set(encoder.encode(str + '\0'));
-					offset += str.length + (8 - (str.length % 8));
-					return ptr;
-				};
-
-				const argc = this.argv.length;
-
-				const argvPtrs = [];
-				this.argv.forEach((arg) => {
-					argvPtrs.push(strPtr(arg));
-				});
-
-				const keys = Object.keys(this.env).sort();
-				argvPtrs.push(keys.length);
-				keys.forEach((key) => {
-					argvPtrs.push(strPtr(`${key}=${this.env[key]}`));
-				});
-
-				const argv = offset;
-				argvPtrs.forEach((ptr) => {
-					mem.setUint32(offset, ptr, true);
-					mem.setUint32(offset + 4, 0, true);
-					offset += 8;
-				});
-
-				this._inst.exports.run(argc, argv);
-				if (this.exited) {
-					this._resolveExitPromise();
-				}
-				await this._exitPromise;
-			}
-
-			_resume() {
-				if (this.exited) {
-					throw new Error('Go program has already exited');
-				}
-				this._inst.exports.resume();
-				if (this.exited) {
-					this._resolveExitPromise();
-				}
-			}
-
-			_makeFuncWrapper(id) {
-				const go = this;
-				return function () {
-					const event = { id: id, this: this, args: arguments };
-					go._pendingEvent = event;
-					go._resume();
-					return event.result;
-				};
-			}
-		};
-
-		if (isNodeJS) {
-			if (process.argv.length < 3) {
-				process.stderr.write('usage: go_js_wasm_exec [wasm binary] [arguments]\n');
-				process.exit(1);
-			}
-
-			const go = new Go();
-			go.argv = process.argv.slice(2);
-			go.env = Object.assign({ TMPDIR: require('os').tmpdir() }, process.env);
-			go.exit = process.exit;
-			WebAssembly.instantiate(fs.readFileSync(process.argv[2]), go.importObject)
-				.then((result) => {
-					process.on('exit', (code) => {
-						// Node.js exits if no event handler is pending
-						if (code === 0 && !go.exited) {
-							// deadlock, make Go print error and stack traces
-							go._pendingEvent = { id: 0 };
-							go._resume();
-						}
-					});
-					return go.run(result.instance);
-				})
-				.catch((err) => {
-					throw err;
-				});
-		}
+	import type { FSModule } from 'browserfs/dist/node/core/FS';
+	import Download from 'lucide-svelte/icons/download';
+	import Info from 'lucide-svelte/icons/info';
+	import LoaderCircle from 'lucide-svelte/icons/loader-circle';
+	import { onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
+
+	async function configureBrowserFS() {
+		await new Promise((resolve, reject) => {
+			// @ts-ignore
+			BrowserFS.configure({ fs: 'InMemory' }, (e) => {
+				if (e) reject(e);
+				// @ts-ignore
+				else resolve();
+			});
+		});
 	}
 
-	BrowserFS.configure(
-		{
-			fs: 'InMemory'
-		},
-		function (e) {
-			if (e) {
-				// An error happened!
-				throw e;
-			}
-			// Otherwise, BrowserFS is ready-to-use!
-			var fs = BrowserFS.BFSRequire('fs');
-			var Buffer = BrowserFS.BFSRequire('buffer').Buffer;
+	let fs: FSModule | undefined;
+	let Buffer: any;
+	let pdfcpuModule: WebAssembly.Module | undefined;
+	let go: Go | undefined;
 
-			initGo(fs, Buffer);
+	onMount(async () => {
+		await configureBrowserFS();
+		fs = BrowserFS.BFSRequire('fs');
+		Buffer = BrowserFS.BFSRequire('buffer').Buffer;
 
-			// Write the test pdf file to the InMemory FS
-			fetch('/test.pdf')
-				.then(function (res) {
-					return res.arrayBuffer();
-				})
-				.then(function (buffer) {
-					fs.writeFile('/test.pdf', Buffer.from(buffer), function (err) {
-						// check it is there
-						fs.readFile('/test.pdf', function (err, contents) {
-							console.log(contents);
-							done();
-						});
-					});
-				});
+		initGo(fs, Buffer);
+		go = new Go();
 
-			function done() {
-				const go = new Go();
-				WebAssembly.instantiateStreaming(fetch('/pdfcpu.wasm'), go.importObject).then((result) => {
-					go.argv = ['pdfcpu.wasm', 'trim', '-pages', '1', '/test.pdf', '/first_page.pdf'];
-					var st = Date.now();
-					go.run(result.instance);
-					console.log('Time taken:', Date.now() - st);
-					fs.readFile('/first_page.pdf', function (err, contents) {
-						console.log('after run main:', err, contents);
-						var blob = new Blob([contents], { type: 'application/pdf' });
-						var url = URL.createObjectURL(blob);
-						var a = document.createElement('a');
-						a.href = url;
-						a.download = 'first_page.pdf';
-						a.click();
-						URL.revokeObjectURL(url);
-					});
-				});
-			}
+		if (!go) {
+			toast.error('Failed to initialize Go wasm runtime', {
+				description: 'Unknown error, you can try refreshing the page'
+			});
+			return;
 		}
-	);
+
+		const result = await WebAssembly.instantiateStreaming(fetch('/pdfcpu.wasm'), go.importObject);
+		pdfcpuModule = result.module;
+	});
+
+	let downloadUrl = '';
+	let progressPrecent = 0;
+
+	function resetProgess() {
+		URL.revokeObjectURL(downloadUrl);
+		downloadUrl = '';
+		progressPrecent = 0;
+	}
+
+	let processing = false;
+
+	let files: FileList;
+	let password: string;
+
+	$: files, password, resetProgess();
+
+	async function decrypt() {
+		resetProgess();
+		processing = true;
+		if (!fs) {
+			toast.error('BrowserFS is not initialized', { description: 'Try again in a few seconds' });
+			processing = false;
+			return;
+		}
+		if (!go) {
+			toast.error('Go wasm runtime is not initialized', {
+				description: 'Try again in a few seconds'
+			});
+			processing = false;
+			return;
+		}
+		if (!pdfcpuModule) {
+			toast.error('pdfcpu wasm module is not initialized', {
+				description: 'Try again in a few seconds'
+			});
+			processing = false;
+			return;
+		}
+		if (!files?.length) {
+			toast.error('No file selected', { description: 'Please select a file' });
+			processing = false;
+			return;
+		}
+		const file = files[0];
+		if (!file) {
+			toast.error('No file selected', { description: 'Please select a file' });
+			processing = false;
+			return;
+		}
+		fs.writeFileSync('/input.pdf', Buffer.from(await file.arrayBuffer()));
+		progressPrecent = 20;
+		const pdfcpuInstance = await WebAssembly.instantiate(pdfcpuModule, go.importObject);
+		if (password) {
+			go.argv = ['pdfcpu.wasm', 'decrypt', '-upw', password, '/input.pdf', '/output.pdf'];
+		} else {
+			go.argv = ['pdfcpu.wasm', 'decrypt', '/input.pdf', '/output.pdf'];
+		}
+		await go.run(pdfcpuInstance);
+		try {
+			fs.statSync('/output.pdf');
+		} catch (e) {
+			if (stdout_stderr.includes('This file is not encrypted')) {
+				toast.error('Failed to decrypt PDF', { description: 'The file is not encrypted' });
+				processing = false;
+				progressPrecent = 0;
+				return;
+			}
+			if (stdout_stderr.includes('Please provide the correct password')) {
+				if (password) {
+					toast.error('Failed to decrypt PDF', { description: 'Invalid password' });
+				} else {
+					toast.error('Failed to decrypt PDF', {
+						description: 'Password is required to decrypt this file'
+					});
+				}
+				processing = false;
+				progressPrecent = 0;
+				return;
+			}
+			if (stdout_stderr.includes('JavaScript error')) {
+				toast.error('Failed to decrypt PDF', {
+					description: 'Unknown JavaScript error, refresh the page and try again'
+				});
+				console.error(e);
+				processing = false;
+				progressPrecent = 0;
+				return;
+			}
+			toast.error('Failed to decrypt PDF', {
+				description:
+					'Unknown error during processing by pdfcpu wasm module. The developer console should have more information.'
+			});
+			console.error(e);
+			processing = false;
+			progressPrecent = 0;
+			return;
+		}
+		progressPrecent = 80;
+		let outputData = fs.readFileSync('/output.pdf');
+		fs.unlinkSync('/input.pdf');
+		fs.unlinkSync('/output.pdf');
+		let blob = new Blob([outputData], { type: 'application/pdf' });
+		downloadUrl = URL.createObjectURL(blob);
+		toast.success('Processing completed!', {
+			description:
+				'Your file should begin downloading automatically. If not, click the download button'
+		});
+		let a = document.createElement('a');
+		a.href = downloadUrl;
+		a.download = 'output.pdf';
+		a.click();
+
+		progressPrecent = 100;
+		processing = false;
+	}
 </script>
+
+<div class="grid w-[22rem] h-fit items-center gap-1.5 mt-4 mx-auto px-4">
+	<h1 class="text-xl font-semibold">Decrypt PDF</h1>
+	<Separator />
+	<h2 class="mb-1">Decrypt PDF and remove all restrictions</h2>
+	<Label for="input-file">Input file</Label>
+	<input
+		id="input-file"
+		class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+		type="file"
+		accept="application/pdf"
+		bind:files
+	/>
+	<div class="flex mt-1">
+		<Label for="password">User password (Optional)</Label>
+		<Tooltip.Root>
+			<Tooltip.Trigger class="cursor-default ml-2">
+				<Info class="w-4 h-4" />
+			</Tooltip.Trigger>
+			<Tooltip.Content>
+				<p>
+					User password is the password that can be use to view the file with some restrictions such
+					as printing or copying. The password may be empty.
+				</p>
+			</Tooltip.Content>
+		</Tooltip.Root>
+	</div>
+	<Input id="password" type="text" placeholder="User password" bind:value={password} />
+	<Progress class="mt-1 mb-0.5" value={progressPrecent} />
+	{#if !processing}
+		{#if !files?.length}
+			<Tooltip.Root>
+				<Tooltip.Trigger class="cursor-default">
+					<Button class="w-full" on:click={decrypt} disabled>Decrypt</Button>
+				</Tooltip.Trigger>
+				<Tooltip.Content>
+					<p>Select a file to continue</p>
+				</Tooltip.Content>
+			</Tooltip.Root>
+		{:else}
+			<Button on:click={decrypt}>Decrypt</Button>
+		{/if}
+	{:else}
+		<Button disabled>
+			<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
+			Processing: {progressPrecent.toFixed(0)}%
+		</Button>
+	{/if}
+	{#if downloadUrl}
+		<a href={downloadUrl} class="w-full h-fit" download="output.pdf">
+			<Button variant="secondary" class="w-full"><Download class="mr-2 h-4 w-4" />Download</Button>
+		</a>
+	{/if}
+</div>

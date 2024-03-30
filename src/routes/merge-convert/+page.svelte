@@ -18,6 +18,7 @@
 	import Trash2 from 'lucide-svelte/icons/trash-2';
 	import { PDFDocument } from 'pdf-lib';
 	import { toast } from 'svelte-sonner';
+	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 
 	const scaleTypes = [
 		{ value: 'all', label: 'All pages' },
@@ -402,7 +403,7 @@
 
 <div class="flex flex-wrap w-full justify-center">
 	<div class="grid w-[22rem] h-fit items-center gap-1.5 mt-4 px-4">
-		<h1 class="text-xl font-semibold">Merge/Convert</h1>
+		<h1 class="text-xl font-semibold">Merge/Convert to PDF</h1>
 		<Separator />
 		<h2 class="mb-1">Merge PDF or image files into one PDF file</h2>
 		<Label for="input-files">Input files</Label>
@@ -500,7 +501,18 @@
 		</div>
 		<Progress class="mt-1 mb-0.5" value={progressPrecent} />
 		{#if !processing}
-			<Button on:click={mergeFiles}>Merge and Download</Button>
+			{#if !files?.length || !filesPreview?.length}
+				<Tooltip.Root>
+					<Tooltip.Trigger class="cursor-default">
+						<Button class="w-full" on:click={mergeFiles} disabled>Merge and Download</Button>
+					</Tooltip.Trigger>
+					<Tooltip.Content>
+						<p>Select one or more files to continue</p>
+					</Tooltip.Content>
+				</Tooltip.Root>
+			{:else}
+				<Button on:click={mergeFiles}>Merge and Download</Button>
+			{/if}
 		{:else}
 			<Button disabled>
 				<LoaderCircle class="mr-2 h-4 w-4 animate-spin" />
