@@ -65,6 +65,7 @@
 	}
 
 	$: scaleDimension, outputSizeUnit, selectedPresetSize, applyPresetSize();
+	$: outputSize, scaleDimension, outputSizeUnit, selectedPresetSize, scaleType, resetProgess();
 
 	async function applyPresetSize() {
 		type SizeKey =
@@ -160,8 +161,14 @@
 		}
 	}
 
-	async function removePresetSize() {
+	function removePresetSize() {
 		selectedPresetSize = '';
+	}
+
+	function resetProgess() {
+		URL.revokeObjectURL(downloadUrl);
+		downloadUrl = '';
+		progressPrecent = 0;
 	}
 
 	let files: FileList;
@@ -172,9 +179,7 @@
 	let filesPreview: Record<any, any>[] = [];
 
 	function updateFilesPreview() {
-		URL.revokeObjectURL(downloadUrl);
-		downloadUrl = '';
-		progressPrecent = 0;
+		resetProgess();
 		filesPreview = [];
 		if (files?.length) {
 			for (let i = 0; i < files.length; i++) {
@@ -190,10 +195,12 @@
 	let filesPreviewComponent: any;
 
 	function sortFilesPreviewOnDrag(evnt: CustomEvent) {
+		resetProgess();
 		filesPreview = evnt.detail;
 	}
 
 	function sortFilesPreviewOnClick(evnt: CustomEvent) {
+		resetProgess();
 		// @ts-ignore
 		const from = evnt.detail.currentTarget.dataset.from;
 		// @ts-ignore
@@ -202,6 +209,7 @@
 	}
 
 	function removeFilePreviewOnClick(evnt: CustomEvent) {
+		resetProgess();
 		// @ts-ignore
 		const index = parseInt(evnt.detail.currentTarget.dataset.index);
 		if (index < 0) return;
@@ -213,11 +221,9 @@
 
 	async function mergeFiles() {
 		processing = true;
-		URL.revokeObjectURL(downloadUrl);
-		downloadUrl = '';
-		progressPrecent = 0;
+		resetProgess();
 
-		if (!files?.length) {
+		if (!files?.length || !filesPreview?.length) {
 			toast.error('No files selected', {
 				description: 'Please select at least one file to merge'
 			});
@@ -232,7 +238,14 @@
 		for (let filePreviewData of filesPreview) {
 			const fileIndex = parseInt(filePreviewData.id);
 
-			const progressPrecentPerFile = 80 / files.length;
+			if (fileIndex < 0 || fileIndex >= files.length) {
+				toast.warning('Invalid file index', {
+					description: 'File index is out of range, this file was skipped'
+				});
+				continue;
+			}
+
+			const progressPrecentPerFile = 80 / filesPreview.length;
 
 			const file = files[fileIndex];
 			const fileData = await file.arrayBuffer();

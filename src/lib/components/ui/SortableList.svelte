@@ -43,12 +43,12 @@
 	}
 
 	export function reorder({ from, to }: any) {
-        const newList = [...list];
-        const [removed] = newList.splice(from, 1);
-        newList.splice(to, 0, removed);
+		const newList = [...list];
+		const [removed] = newList.splice(from, 1);
+		newList.splice(to, 0, removed);
 
 		dispatch('sort', newList);
-	};
+	}
 </script>
 
 {#if list?.length}

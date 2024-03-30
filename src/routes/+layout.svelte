@@ -55,7 +55,9 @@
 						<DropdownMenu.Label>Pages</DropdownMenu.Label>
 						<DropdownMenu.Separator />
 						{#each Object.entries(routes) as [route, name]}
-							<a href={route}><DropdownMenu.Item class="cursor-pointer">{name}</DropdownMenu.Item></a>
+							<a href={route}
+								><DropdownMenu.Item class="cursor-pointer">{name}</DropdownMenu.Item></a
+							>
 						{/each}
 					</DropdownMenu.Group>
 				</DropdownMenu.Content>
