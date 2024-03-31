@@ -9,7 +9,7 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
-	import pdflibWorkerUrl from '$lib/workers/pdf-lib.worker?url';
+	import pdflibWorker from '$lib/workers/pdf-lib.worker?worker';
 	import ArrowDown from 'lucide-svelte/icons/arrow-down';
 	import ArrowDownToLine from 'lucide-svelte/icons/arrow-down-to-line';
 	import ArrowUp from 'lucide-svelte/icons/arrow-up';
@@ -18,7 +18,7 @@
 	import EllipsisVertical from 'lucide-svelte/icons/ellipsis-vertical';
 	import LoaderCircle from 'lucide-svelte/icons/loader-circle';
 	import Trash2 from 'lucide-svelte/icons/trash-2';
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	const scaleTypes = [
@@ -204,44 +204,41 @@
 		filesPreview = newFilesPreview;
 	}
 
-	let worker: Worker | undefined;
+	const worker: Worker = new pdflibWorker();
 
-	onMount(() => {
-		worker = new Worker(pdflibWorkerUrl, { type: 'module' });
-		worker.onmessage = (event) => {
-			const { type, data } = event.data;
-			switch (type) {
-				case 'progress':
-					progressPrecent = data;
-					break;
-				case 'warning':
-					toast.warning(data.message, {
-						description: data.description
-					});
-					break;
-				case 'error':
-					toast.error(data.message, {
-						description: data.description
-					});
-					processing = false;
-					resetProgess();
-					break;
-				case 'success':
-					const blob = data;
-					downloadUrl = URL.createObjectURL(blob);
-					toast.success('Processing completed!', {
-						description:
-							'Your file should begin downloading automatically. If not, click the download button'
-					});
-					const a = document.createElement('a');
-					a.href = downloadUrl;
-					a.download = 'output.pdf';
-					a.click();
-					processing = false;
-					break;
-			}
-		};
-	});
+	worker.onmessage = (event) => {
+		const { type, data } = event.data;
+		switch (type) {
+			case 'progress':
+				progressPrecent = data;
+				break;
+			case 'warning':
+				toast.warning(data.message, {
+					description: data.description
+				});
+				break;
+			case 'error':
+				toast.error(data.message, {
+					description: data.description
+				});
+				processing = false;
+				resetProgess();
+				break;
+			case 'success':
+				const blob = data;
+				downloadUrl = URL.createObjectURL(blob);
+				toast.success('Processing completed!', {
+					description:
+						'Your file should begin downloading automatically. If not, click the download button'
+				});
+				const a = document.createElement('a');
+				a.href = downloadUrl;
+				a.download = 'output.pdf';
+				a.click();
+				processing = false;
+				break;
+		}
+	};
 
 	onDestroy(() => {
 		worker?.terminate();
@@ -260,14 +257,8 @@
 		}
 		if (outputSize == 0) {
 			toast.error('Output size cannot be zero', {
-				description: 'It can be less than 0 though, isn\'t that cool?'
+				description: "It can be less than 0 though, isn't that cool?"
 			});
-			processing = false;
-			return;
-		}
-
-		if (!worker) {
-			toast.error('Worker not initialized', { description: 'Please try again in a few seconds' });
 			processing = false;
 			return;
 		}
