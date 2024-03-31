@@ -175,8 +175,10 @@
 
 	let filesPreview: Record<any, any>[] = [];
 
+	$: files, updateFilesPreview();
+	$: files, resetProgess();
+
 	function updateFilesPreview() {
-		resetProgess();
 		filesPreview = [];
 		if (files?.length) {
 			for (let i = 0; i < files.length; i++) {
@@ -414,7 +416,6 @@
 			accept="application/pdf,image/png,image/jpg,image/jpeg"
 			multiple
 			bind:files
-			on:change={updateFilesPreview}
 		/>
 		<div class="flex justify-between">
 			<div>
