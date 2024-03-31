@@ -18,7 +18,7 @@
 	import EllipsisVertical from 'lucide-svelte/icons/ellipsis-vertical';
 	import LoaderCircle from 'lucide-svelte/icons/loader-circle';
 	import Trash2 from 'lucide-svelte/icons/trash-2';
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	const scaleTypes = [
@@ -179,24 +179,24 @@
 
 	let filesPreviewComponent: any;
 
-	function sortFilesPreviewOnDrag(evnt: CustomEvent) {
+	function sortFilesPreviewOnDrag(event: CustomEvent) {
 		resetProgess();
-		filesPreview = evnt.detail;
+		filesPreview = event.detail;
 	}
 
-	function sortFilesPreviewOnClick(evnt: CustomEvent) {
+	function sortFilesPreviewOnClick(event: CustomEvent) {
 		resetProgess();
 		// @ts-ignore
-		const from = evnt.detail.currentTarget.dataset.from;
+		const from = event.detail.currentTarget.dataset.from;
 		// @ts-ignore
-		const to = evnt.detail.currentTarget.dataset.to;
+		const to = event.detail.currentTarget.dataset.to;
 		filesPreviewComponent.reorder({ from, to });
 	}
 
-	function removeFilePreviewOnClick(evnt: CustomEvent) {
+	function removeFilePreviewOnClick(event: CustomEvent) {
 		resetProgess();
 		// @ts-ignore
-		const index = parseInt(evnt.detail.currentTarget.dataset.index);
+		const index = parseInt(event.detail.currentTarget.dataset.index);
 		if (index < 0) return;
 		if (index >= filesPreview.length) return;
 		const newFilesPreview = [...filesPreview];
@@ -204,7 +204,7 @@
 		filesPreview = newFilesPreview;
 	}
 
-	let worker: Worker;
+	let worker: Worker | undefined;
 
 	onMount(() => {
 		worker = new Worker(pdflibWorkerUrl, { type: 'module' });
@@ -235,13 +235,16 @@
 					});
 					const a = document.createElement('a');
 					a.href = downloadUrl;
-					a.download = "output.pdf";
+					a.download = 'output.pdf';
 					a.click();
 					processing = false;
 					break;
 			}
 		};
-	
+	});
+
+	onDestroy(() => {
+		worker?.terminate();
 	});
 
 	async function mergeFiles() {
@@ -252,6 +255,19 @@
 			toast.error('No files selected', {
 				description: 'Please select at least one file to merge'
 			});
+			processing = false;
+			return;
+		}
+		if (outputSize == 0) {
+			toast.error('Output size cannot be zero', {
+				description: 'It can be less than 0 though, isn\'t that cool?'
+			});
+			processing = false;
+			return;
+		}
+
+		if (!worker) {
+			toast.error('Worker not initialized', { description: 'Please try again in a few seconds' });
 			processing = false;
 			return;
 		}

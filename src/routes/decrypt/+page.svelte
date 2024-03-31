@@ -5,49 +5,12 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
-	import { Go, initGo, stdout_stderr } from '$lib/wasm_exec';
-	import * as BrowserFS from 'browserfs';
-	import type { FSModule } from 'browserfs/dist/node/core/FS';
+	import pdfcpuWorkerUrl from '$lib/workers/pdfcpu.worker?url';
 	import Download from 'lucide-svelte/icons/download';
 	import Info from 'lucide-svelte/icons/info';
 	import LoaderCircle from 'lucide-svelte/icons/loader-circle';
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
-
-	async function configureBrowserFS() {
-		await new Promise((resolve, reject) => {
-			// @ts-ignore
-			BrowserFS.configure({ fs: 'InMemory' }, (e) => {
-				if (e) reject(e);
-				// @ts-ignore
-				else resolve();
-			});
-		});
-	}
-
-	let fs: FSModule | undefined;
-	let Buffer: any;
-	let pdfcpuModule: WebAssembly.Module | undefined;
-	let go: Go | undefined;
-
-	onMount(async () => {
-		await configureBrowserFS();
-		fs = BrowserFS.BFSRequire('fs');
-		Buffer = BrowserFS.BFSRequire('buffer').Buffer;
-
-		initGo(fs, Buffer);
-		go = new Go();
-
-		if (!go) {
-			toast.error('Failed to initialize Go wasm runtime', {
-				description: 'Unknown error, you can try refreshing the page'
-			});
-			return;
-		}
-
-		const result = await WebAssembly.instantiateStreaming(fetch('/pdfcpu.wasm'), go.importObject);
-		pdfcpuModule = result.module;
-	});
 
 	let downloadUrl = '';
 	let progressPrecent = 0;
@@ -65,28 +28,53 @@
 
 	$: files, password, resetProgess();
 
+	let worker: Worker | undefined;
+
+	onMount(() => {
+		worker = new Worker(pdfcpuWorkerUrl, { type: 'module' });
+		worker.onmessage = (event) => {
+			const { type, data } = event.data;
+			switch (type) {
+				case 'progress':
+					progressPrecent = data;
+					break;
+				case 'warning':
+					toast.warning(data.message, {
+						description: data.description
+					});
+					break;
+				case 'error':
+					toast.error(data.message, {
+						description: data.description
+					});
+					processing = false;
+					resetProgess();
+					break;
+				case 'success':
+					const blob = data;
+					downloadUrl = URL.createObjectURL(blob);
+					toast.success('Processing completed!', {
+						description:
+							'Your file should begin downloading automatically. If not, click the download button'
+					});
+					const a = document.createElement('a');
+					a.href = downloadUrl;
+					a.download = 'output.pdf';
+					a.click();
+					processing = false;
+					break;
+			}
+		};
+	});
+
+	onDestroy(() => {
+		worker?.terminate();
+	});
+
 	async function decrypt() {
 		resetProgess();
 		processing = true;
-		if (!fs) {
-			toast.error('BrowserFS is not initialized', { description: 'Try again in a few seconds' });
-			processing = false;
-			return;
-		}
-		if (!go) {
-			toast.error('Go wasm runtime is not initialized', {
-				description: 'Try again in a few seconds'
-			});
-			processing = false;
-			return;
-		}
-		if (!pdfcpuModule) {
-			toast.error('pdfcpu wasm module is not initialized', {
-				description: 'Try again in a few seconds'
-			});
-			processing = false;
-			return;
-		}
+
 		if (!files?.length) {
 			toast.error('No file selected', { description: 'Please select a file' });
 			processing = false;
@@ -98,71 +86,22 @@
 			processing = false;
 			return;
 		}
-		fs.writeFileSync('/input.pdf', Buffer.from(await file.arrayBuffer()));
-		progressPrecent = 20;
-		const pdfcpuInstance = await WebAssembly.instantiate(pdfcpuModule, go.importObject);
-		if (password) {
-			go.argv = ['pdfcpu.wasm', 'decrypt', '-upw', password, '/input.pdf', '/output.pdf'];
-		} else {
-			go.argv = ['pdfcpu.wasm', 'decrypt', '/input.pdf', '/output.pdf'];
-		}
-		await go.run(pdfcpuInstance);
-		try {
-			fs.statSync('/output.pdf');
-		} catch (e) {
-			if (stdout_stderr.includes('This file is not encrypted')) {
-				toast.error('Failed to decrypt PDF', { description: 'The file is not encrypted' });
-				processing = false;
-				progressPrecent = 0;
-				return;
-			}
-			if (stdout_stderr.includes('Please provide the correct password')) {
-				if (password) {
-					toast.error('Failed to decrypt PDF', { description: 'Invalid password' });
-				} else {
-					toast.error('Failed to decrypt PDF', {
-						description: 'Password is required to decrypt this file'
-					});
-				}
-				processing = false;
-				progressPrecent = 0;
-				return;
-			}
-			if (stdout_stderr.includes('JavaScript error')) {
-				toast.error('Failed to decrypt PDF', {
-					description: 'Unknown JavaScript error, refresh the page and try again'
-				});
-				console.error(e);
-				processing = false;
-				progressPrecent = 0;
-				return;
-			}
-			toast.error('Failed to decrypt PDF', {
-				description:
-					'Unknown error during processing by pdfcpu wasm module. The developer console should have more information.'
-			});
-			console.error(e);
+		if (file.type !== 'application/pdf') {
+			toast.error('Invalid file type', { description: 'Please select a PDF file' });
 			processing = false;
-			progressPrecent = 0;
 			return;
 		}
-		progressPrecent = 80;
-		let outputData = fs.readFileSync('/output.pdf');
-		fs.unlinkSync('/input.pdf');
-		fs.unlinkSync('/output.pdf');
-		let blob = new Blob([outputData], { type: 'application/pdf' });
-		downloadUrl = URL.createObjectURL(blob);
-		toast.success('Processing completed!', {
-			description:
-				'Your file should begin downloading automatically. If not, click the download button'
-		});
-		let a = document.createElement('a');
-		a.href = downloadUrl;
-		a.download = 'output.pdf';
-		a.click();
+		if (!worker) {
+			toast.error('Worker not initialized', { description: 'Please try again in a few seconds' });
+			processing = false;
+			return;
+		}
 
-		progressPrecent = 100;
-		processing = false;
+		worker.postMessage({
+			type: 'decrypt',
+			file,
+			password
+		});
 	}
 </script>
 
