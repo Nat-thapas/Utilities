@@ -8,6 +8,8 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
+	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import pdflibWorkerUrl from '$lib/workers/pdf-lib.worker?url';
 	import ArrowDown from 'lucide-svelte/icons/arrow-down';
 	import ArrowDownToLine from 'lucide-svelte/icons/arrow-down-to-line';
 	import ArrowUp from 'lucide-svelte/icons/arrow-up';
@@ -16,9 +18,8 @@
 	import EllipsisVertical from 'lucide-svelte/icons/ellipsis-vertical';
 	import LoaderCircle from 'lucide-svelte/icons/loader-circle';
 	import Trash2 from 'lucide-svelte/icons/trash-2';
-	import { PDFDocument } from 'pdf-lib';
+	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 
 	const scaleTypes = [
 		{ value: 'all', label: 'All pages' },
@@ -45,21 +46,6 @@
 	let outputSize = 210;
 
 	let selectedPresetSize = 'a4';
-
-	function convertUnit(
-		value: number,
-		from: 'mm' | 'cm' | 'in' | 'pdf',
-		to: 'mm' | 'cm' | 'in' | 'pdf'
-	) {
-		const units = {
-			mm: 1,
-			cm: 10,
-			in: 25.4,
-			pdf: 0.3527777777777
-		};
-
-		return (value * units[from]) / units[to];
-	}
 
 	$: scaleDimension, outputSizeUnit, selectedPresetSize, applyPresetSize();
 	$: outputSize, scaleDimension, outputSizeUnit, selectedPresetSize, scaleType, resetProgess();
@@ -173,7 +159,7 @@
 	let processing = false;
 	let downloadUrl: string = '';
 
-	let filesPreview: Record<any, any>[] = [];
+	let filesPreview: Record<string, string>[] = [];
 
 	$: files, updateFilesPreview();
 	$: files, resetProgess();
@@ -218,6 +204,46 @@
 		filesPreview = newFilesPreview;
 	}
 
+	let worker: Worker;
+
+	onMount(() => {
+		worker = new Worker(pdflibWorkerUrl, { type: 'module' });
+		worker.onmessage = (event) => {
+			const { type, data } = event.data;
+			switch (type) {
+				case 'progress':
+					progressPrecent = data;
+					break;
+				case 'warning':
+					toast.warning(data.message, {
+						description: data.description
+					});
+					break;
+				case 'error':
+					toast.error(data.message, {
+						description: data.description
+					});
+					processing = false;
+					resetProgess();
+					break;
+				case 'success':
+					const blob = data;
+					downloadUrl = URL.createObjectURL(blob);
+					toast.success('Processing completed!', {
+						description:
+							'Your file should begin downloading automatically. If not, click the download button'
+					});
+					const a = document.createElement('a');
+					a.href = downloadUrl;
+					a.download = "output.pdf";
+					a.click();
+					processing = false;
+					break;
+			}
+		};
+	
+	});
+
 	async function mergeFiles() {
 		processing = true;
 		resetProgess();
@@ -230,169 +256,15 @@
 			return;
 		}
 
-		const mergedPDF = await PDFDocument.create();
-
-		let fileNumber = 0;
-
-		for (let filePreviewData of filesPreview) {
-			const fileIndex = parseInt(filePreviewData.id);
-
-			if (fileIndex < 0 || fileIndex >= files.length) {
-				toast.warning('Invalid file index', {
-					description: 'File index is out of range, this file was skipped'
-				});
-				continue;
-			}
-
-			const progressPrecentPerFile = 80 / filesPreview.length;
-
-			const file = files[fileIndex];
-			const fileData = await file.arrayBuffer();
-
-			switch (file.type) {
-				case 'image/png': {
-					try {
-						const image = await mergedPDF.embedPng(fileData);
-						let width: number, height: number;
-						if (scaleDimension.value === 'width') {
-							width = convertUnit(
-								outputSize,
-								outputSizeUnit.value as 'mm' | 'cm' | 'in' | 'pdf',
-								'pdf'
-							);
-							height = (image.height / image.width) * width;
-						} else {
-							height = convertUnit(
-								outputSize,
-								outputSizeUnit.value as 'mm' | 'cm' | 'in' | 'pdf',
-								'pdf'
-							);
-							width = (image.width / image.height) * height;
-						}
-						const page = mergedPDF.addPage([width, height]);
-						page.drawImage(image, {
-							x: 0,
-							y: 0,
-							width: width,
-							height: height
-						});
-					} catch (error) {
-						toast.warning(`Failed to embed image: ${file.name}`, {
-							description: 'Unknown error, this file was skipped'
-						});
-					}
-					break;
-				}
-
-				case 'image/jpg':
-				case 'image/jpeg': {
-					try {
-						const image = await mergedPDF.embedJpg(fileData);
-						let width: number, height: number;
-						if (scaleDimension.value === 'width') {
-							width = convertUnit(
-								outputSize,
-								outputSizeUnit.value as 'mm' | 'cm' | 'in' | 'pdf',
-								'pdf'
-							);
-							height = (image.height / image.width) * width;
-						} else {
-							height = convertUnit(
-								outputSize,
-								outputSizeUnit.value as 'mm' | 'cm' | 'in' | 'pdf',
-								'pdf'
-							);
-							width = (image.width / image.height) * height;
-						}
-						const page = mergedPDF.addPage([width, height]);
-						page.drawImage(image, {
-							x: 0,
-							y: 0,
-							width: width,
-							height: height
-						});
-					} catch (error) {
-						toast.warning(`Failed to embed image: ${file.name}`, {
-							description: 'Unknown error, this file was skipped'
-						});
-					}
-					break;
-				}
-
-				case 'application/pdf':
-					try {
-						const pdf = await PDFDocument.load(fileData);
-						const copiedPages = await mergedPDF.copyPages(pdf, pdf.getPageIndices());
-						const pageCount = copiedPages.length;
-						for (let [pageIndex, page] of copiedPages.entries()) {
-							if (scaleType.value === 'all') {
-								let scaleFactor: number;
-								if (scaleDimension.value === 'width') {
-									scaleFactor =
-										convertUnit(
-											outputSize,
-											outputSizeUnit.value as 'mm' | 'cm' | 'in' | 'pdf',
-											'pdf'
-										) / page.getWidth();
-								} else {
-									scaleFactor =
-										convertUnit(
-											outputSize,
-											outputSizeUnit.value as 'mm' | 'cm' | 'in' | 'pdf',
-											'pdf'
-										) / page.getHeight();
-								}
-								page.scale(scaleFactor, scaleFactor);
-							}
-							mergedPDF.addPage(page);
-							progressPrecent =
-								fileNumber * progressPrecentPerFile +
-								((pageIndex + 1) * progressPrecentPerFile) / pageCount;
-						}
-					} catch (error) {
-						toast.warning(`Failed to load PDF: ${file.name}`, {
-							description:
-								error instanceof Error && error.message.includes('is encrypted')
-									? 'Document is encrypted, this file was skipped'
-									: 'Unknown error, this file was skipped'
-						});
-					}
-					break;
-
-				default:
-					toast.warning(`Unsupported file type: ${file.name}`, {
-						description: `File type ${file.type} is not supported, this file was skipped`
-					});
-					break;
-			}
-
-			progressPrecent = (fileNumber + 1) * progressPrecentPerFile;
-
-			fileNumber++;
-		}
-
-		if (mergedPDF.getPageCount() === 0) {
-			toast.error('Empty output', {
-				description: 'Output is empty because all files failed to be merged'
-			});
-			progressPrecent = 100;
-			processing = false;
-			return;
-		}
-		const mergedPdf = await mergedPDF.save();
-		const mergedPdfBlob = new Blob([mergedPdf], { type: 'application/pdf' });
-		downloadUrl = URL.createObjectURL(mergedPdfBlob);
-		toast.success('Processing completed!', {
-			description:
-				'Your file should begin downloading automatically. If not, click the download button'
+		worker.postMessage({
+			type: 'merge',
+			files: files,
+			filesPreview: filesPreview,
+			scaleType: scaleType.value,
+			scaleDimension: scaleDimension.value,
+			outputSize: outputSize,
+			outputSizeUnit: outputSizeUnit.value
 		});
-		const a = document.createElement('a');
-		a.href = downloadUrl;
-		a.download = 'output.pdf';
-		a.click();
-
-		progressPrecent = 100;
-		processing = false;
 	}
 
 	$: smallScreen = innerWidth < 640;
