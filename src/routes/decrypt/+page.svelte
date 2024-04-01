@@ -8,7 +8,7 @@
 	import Download from 'lucide-svelte/icons/download';
 	import Info from 'lucide-svelte/icons/info';
 	import LoaderCircle from 'lucide-svelte/icons/loader-circle';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	let downloadUrl = '';
@@ -27,43 +27,47 @@
 
 	$: files, password, resetProgess();
 
-	const worker = new Worker(new URL('$lib/workers/pdfcpu.worker.ts', import.meta.url), {
-		type: 'module'
-	});
+	let worker: Worker | undefined;
 
-	worker.onmessage = (event) => {
-		const { type, data } = event.data;
-		switch (type) {
-			case 'progress':
-				progressPrecent = data;
-				break;
-			case 'warning':
-				toast.warning(data.message, {
-					description: data.description
-				});
-				break;
-			case 'error':
-				toast.error(data.message, {
-					description: data.description
-				});
-				processing = false;
-				resetProgess();
-				break;
-			case 'success':
-				const blob = data;
-				downloadUrl = URL.createObjectURL(blob);
-				toast.success('Processing completed!', {
-					description:
-						'Your file should begin downloading automatically. If not, click the download button'
-				});
-				const a = document.createElement('a');
-				a.href = downloadUrl;
-				a.download = 'output.pdf';
-				a.click();
-				processing = false;
-				break;
-		}
-	};
+	onMount(() => {
+		worker = new Worker(new URL('$lib/workers/pdfcpu.worker.ts', import.meta.url), {
+			type: 'module'
+		});
+
+		worker.onmessage = (event) => {
+			const { type, data } = event.data;
+			switch (type) {
+				case 'progress':
+					progressPrecent = data;
+					break;
+				case 'warning':
+					toast.warning(data.message, {
+						description: data.description
+					});
+					break;
+				case 'error':
+					toast.error(data.message, {
+						description: data.description
+					});
+					processing = false;
+					resetProgess();
+					break;
+				case 'success':
+					const blob = data;
+					downloadUrl = URL.createObjectURL(blob);
+					toast.success('Processing completed!', {
+						description:
+							'Your file should begin downloading automatically. If not, click the download button'
+					});
+					const a = document.createElement('a');
+					a.href = downloadUrl;
+					a.download = 'output.pdf';
+					a.click();
+					processing = false;
+					break;
+			}
+		};
+	});
 
 	onDestroy(() => {
 		worker?.terminate();
@@ -86,6 +90,11 @@
 		}
 		if (file.type !== 'application/pdf') {
 			toast.error('Invalid file type', { description: 'Please select a PDF file' });
+			processing = false;
+			return;
+		}
+		if (!worker) {
+			toast.error('Worker not initialized', { description: 'Please try again in a few seconds' });
 			processing = false;
 			return;
 		}
