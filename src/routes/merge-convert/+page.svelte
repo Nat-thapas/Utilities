@@ -9,7 +9,6 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
-	import pdflibWorker from '$lib/workers/pdf-lib.worker?worker';
 	import ArrowDown from 'lucide-svelte/icons/arrow-down';
 	import ArrowDownToLine from 'lucide-svelte/icons/arrow-down-to-line';
 	import ArrowUp from 'lucide-svelte/icons/arrow-up';
@@ -204,7 +203,9 @@
 		filesPreview = newFilesPreview;
 	}
 
-	const worker: Worker = new pdflibWorker();
+	const worker = new Worker(new URL('$lib/workers/pdf-lib.worker.ts', import.meta.url), {
+		type: 'module'
+	});
 
 	worker.onmessage = (event) => {
 		const { type, data } = event.data;

@@ -5,11 +5,10 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
-	import pdfcpuWorker from '$lib/workers/pdfcpu.worker?worker';
 	import Download from 'lucide-svelte/icons/download';
 	import Info from 'lucide-svelte/icons/info';
 	import LoaderCircle from 'lucide-svelte/icons/loader-circle';
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	let downloadUrl = '';
@@ -28,7 +27,9 @@
 
 	$: files, password, resetProgess();
 
-	const worker: Worker = new pdfcpuWorker();
+	const worker = new Worker(new URL('$lib/workers/pdfcpu.worker.ts', import.meta.url), {
+		type: 'module'
+	});
 
 	worker.onmessage = (event) => {
 		const { type, data } = event.data;
