@@ -273,9 +273,6 @@
 			outputSizeUnit: outputSizeUnit.value
 		});
 	}
-
-	$: smallScreen = innerWidth < 640;
-	$: largeScreen = innerWidth >= 640;
 </script>
 
 <svelte:head>
@@ -300,7 +297,7 @@
 			<div>
 				<Label for="scale-type">Scale</Label>
 				<Select.Root bind:selected={scaleType}>
-					<Select.Trigger class="w-36">
+					<Select.Trigger id="scale-type" class="w-36" title="Scale type">
 						<Select.Value placeholder="Scale type" />
 					</Select.Trigger>
 					<Select.Content>
@@ -311,13 +308,12 @@
 							{/each}
 						</Select.Group>
 					</Select.Content>
-					<Select.Input name="scale-type" />
 				</Select.Root>
 			</div>
 			<div>
 				<Label for="scale-dimension">Dimension</Label>
 				<Select.Root bind:selected={scaleDimension}>
-					<Select.Trigger class="w-40">
+					<Select.Trigger id="scale-dimension" class="w-40" title="Scale dimension">
 						<Select.Value placeholder="Scale dimension" />
 					</Select.Trigger>
 					<Select.Content>
@@ -330,7 +326,6 @@
 							{/each}
 						</Select.Group>
 					</Select.Content>
-					<Select.Input name="scale-dimension" />
 				</Select.Root>
 			</div>
 		</div>
@@ -365,7 +360,7 @@
 				</DropdownMenu.Root>
 			</div>
 			<Select.Root bind:selected={outputSizeUnit}>
-				<Select.Trigger class="w-48">
+				<Select.Trigger class="w-48" title="Unit">
 					<Select.Value placeholder="Unit" />
 				</Select.Trigger>
 				<Select.Content>
@@ -376,10 +371,9 @@
 						{/each}
 					</Select.Group>
 				</Select.Content>
-				<Select.Input name="scale-unit" />
 			</Select.Root>
 		</div>
-		<Progress class="mt-1 mb-0.5" value={progressPrecent} />
+		<Progress class="mt-1 mb-0.5" title="Progress" value={progressPrecent} />
 		{#if !processing}
 			{#if !files?.length || !filesPreview?.length}
 				<Tooltip.Root>
@@ -407,8 +401,8 @@
 		{/if}
 	</div>
 	<div class="w-80 mx-4 mt-4">
-		<Label class="text-base">Selected files</Label>
-		<div class="w-full h-fit rounded-md border mt-2">
+		<h3 class="text-base font-medium leading-none mt-1">Selected files</h3>
+		<div class="w-full h-fit rounded-md border mt-3">
 			<SortableList
 				bind:this={filesPreviewComponent}
 				list={filesPreview}

@@ -19,6 +19,8 @@ let pdfcpuModule: WebAssembly.Module | undefined;
 let go: Go | undefined;
 let initialized = false;
 
+const wasmFile = fetch('/pdfcpu.wasm');
+
 async function init() {
 	await configureBrowserFS();
 	fs = BrowserFS.BFSRequire('fs');
@@ -38,7 +40,7 @@ async function init() {
 		return;
 	}
 
-	const result = await WebAssembly.instantiateStreaming(fetch('/pdfcpu.wasm'), go.importObject);
+	const result = await WebAssembly.instantiateStreaming(wasmFile, go.importObject);
 	pdfcpuModule = result.module;
 
 	initialized = true;

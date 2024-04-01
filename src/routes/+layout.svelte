@@ -26,6 +26,13 @@
 
 <svelte:window bind:innerWidth bind:innerHeight />
 
+<svelte:head>
+	<meta
+		name="description"
+		content="A collection of utilities for working with PDF and more in the future"
+	/>
+</svelte:head>
+
 <ModeWatcher />
 
 <nav class="flex justify-between">
@@ -50,7 +57,10 @@
 	{:else}
 		<nav class="h-12">
 			<DropdownMenu.Root>
-				<DropdownMenu.Trigger><Menu class="h-8 w-8 my-2 mx-4" /></DropdownMenu.Trigger>
+				<DropdownMenu.Trigger>
+					<Menu class="h-8 w-8 my-2 mx-4" />
+					<span class="sr-only">Navbar</span>
+				</DropdownMenu.Trigger>
 				<DropdownMenu.Content>
 					<DropdownMenu.Group>
 						<DropdownMenu.Label>Pages</DropdownMenu.Label>

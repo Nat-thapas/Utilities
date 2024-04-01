@@ -97,6 +97,10 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Decrypt PDF</title>
+</svelte:head>
+
 <div class="grid w-[22rem] h-fit items-center gap-1.5 mt-4 mx-auto px-4">
 	<h1 class="text-xl font-semibold">Decrypt PDF</h1>
 	<Separator />
@@ -114,6 +118,7 @@
 		<Tooltip.Root>
 			<Tooltip.Trigger class="cursor-default ml-2">
 				<Info class="w-4 h-4" />
+				<span class="sr-only">User password info</span>
 			</Tooltip.Trigger>
 			<Tooltip.Content>
 				<p>
@@ -124,7 +129,7 @@
 		</Tooltip.Root>
 	</div>
 	<Input id="password" type="text" placeholder="User password" bind:value={password} />
-	<Progress class="mt-1 mb-0.5" value={progressPrecent} />
+	<Progress class="mt-1 mb-0.5" title="Progress" value={progressPrecent} />
 	{#if !processing}
 		{#if !files?.length}
 			<Tooltip.Root>
