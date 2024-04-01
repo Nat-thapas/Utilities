@@ -37,17 +37,17 @@
 
 <nav class="flex justify-between">
 	{#if largeScreen}
-		<ul class="inline-flex space-x-4 items-center ml-8">
+		<ul class="ml-8 inline-flex items-center space-x-4">
 			{#each Object.entries(routes) as [route, name]}
 				{#if $page.url.pathname == route}
 					<li
-						class="flex text-center bg-background text-foreground text-xl font-semibold px-4 w-fit border-b-2 border-foreground h-12 items-center"
+						class="flex h-12 w-fit items-center border-b-2 border-foreground bg-background px-4 text-center text-xl font-semibold text-foreground"
 					>
 						<a href={route}>{name}</a>
 					</li>
 				{:else}
 					<li
-						class="flex text-center bg-background text-foreground text-xl font-semibold px-4 w-fit h-12 items-center"
+						class="flex h-12 w-fit items-center bg-background px-4 text-center text-xl font-semibold text-foreground"
 					>
 						<a href={route}>{name}</a>
 					</li>
@@ -58,7 +58,7 @@
 		<nav class="h-12">
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger>
-					<Menu class="h-8 w-8 my-2 mx-4" />
+					<Menu class="mx-4 my-2 h-8 w-8" />
 					<span class="sr-only">Navbar</span>
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Content>
@@ -75,7 +75,7 @@
 			</DropdownMenu.Root>
 		</nav>
 	{/if}
-	<div class="inline-flex items-center mr-2">
+	<div class="mr-2 inline-flex items-center">
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger asChild let:builder>
 				<Button builders={[builder]} variant="outline" size="icon">

@@ -289,8 +289,8 @@
 	<title>Merge/Convert to PDF</title>
 </svelte:head>
 
-<div class="flex flex-wrap w-full justify-center">
-	<div class="grid w-[22rem] h-fit items-center gap-1.5 mt-4 px-4">
+<div class="flex w-full flex-wrap justify-center">
+	<div class="mt-4 grid h-fit w-[22rem] items-center gap-1.5 px-4">
 		<h1 class="text-xl font-semibold">Merge/Convert to PDF</h1>
 		<Separator />
 		<h2 class="mb-1">Merge PDF or image files into one PDF file</h2>
@@ -342,12 +342,12 @@
 		<Label for="output-size">Output {scaleDimension.label.toLowerCase()}</Label>
 		<div class="flex">
 			<div
-				class="flex h-10 mr-2 rounded-md border border-input bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+				class="mr-2 flex h-10 rounded-md border border-input bg-background text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 			>
 				<Input
 					type="number"
 					id="output-size"
-					class="border-0 h-[2.375rem] mr-1"
+					class="mr-1 h-[2.375rem] border-0"
 					placeholder="Output size"
 					bind:value={outputSize}
 					on:change={removePresetSize}
@@ -383,7 +383,7 @@
 				</Select.Content>
 			</Select.Root>
 		</div>
-		<Progress class="mt-1 mb-0.5" title="Progress" value={progressPrecent} />
+		<Progress class="mb-0.5 mt-1" title="Progress" value={progressPrecent} />
 		{#if !processing}
 			{#if !files?.length || !filesPreview?.length}
 				<Tooltip.Root>
@@ -404,15 +404,15 @@
 			</Button>
 		{/if}
 		{#if downloadUrl}
-			<a href={downloadUrl} class="w-full h-fit" download="output.pdf">
+			<a href={downloadUrl} class="h-fit w-full" download="output.pdf">
 				<Button variant="secondary" class="w-full"><Download class="mr-2 h-4 w-4" />Download</Button
 				>
 			</a>
 		{/if}
 	</div>
-	<div class="w-80 mx-4 mt-4">
-		<h3 class="text-base font-medium leading-none mt-1">Selected files</h3>
-		<div class="w-full h-fit rounded-md border mt-3">
+	<div class="mx-4 mt-4 w-80">
+		<h3 class="mt-1 text-base font-medium leading-none">Selected files</h3>
+		<div class="mt-3 h-fit w-full rounded-md border">
 			<SortableList
 				bind:this={filesPreviewComponent}
 				list={filesPreview}
@@ -420,16 +420,16 @@
 				let:item
 				let:index
 			>
-				<div class="flex items-center hover:bg-muted hover:bg-opacity-40 rounded-lg p-1.5 m-0.5">
-					<Avatar.Root class="w-8 h-8">
+				<div class="m-0.5 flex items-center rounded-lg p-1.5 hover:bg-muted hover:bg-opacity-40">
+					<Avatar.Root class="h-8 w-8">
 						<Avatar.Fallback class="font-semibold">{index + 1}</Avatar.Fallback>
 					</Avatar.Root>
-					<p class="overflow-hidden text-nowrap text-ellipsis w-52 ml-2">
+					<p class="ml-2 w-52 overflow-hidden text-ellipsis text-nowrap">
 						{item.name}
 					</p>
 					<DropdownMenu.Root>
 						<DropdownMenu.Trigger>
-							<Button variant="ghost" size="sm" class="w-9 p-0 ml-2">
+							<Button variant="ghost" size="sm" class="ml-2 w-9 p-0">
 								<EllipsisVertical class="h-4 w-4" />
 							</Button>
 						</DropdownMenu.Trigger>

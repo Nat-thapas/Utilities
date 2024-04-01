@@ -112,7 +112,7 @@
 	<link rel="prefetch" href="/pdfcpu.wasm" as="fetch" />
 </svelte:head>
 
-<div class="grid w-[22rem] h-fit items-center gap-1.5 mt-4 mx-auto px-4">
+<div class="mx-auto mt-4 grid h-fit w-[22rem] items-center gap-1.5 px-4">
 	<h1 class="text-xl font-semibold">Decrypt PDF</h1>
 	<Separator />
 	<h2 class="mb-1">Decrypt PDF and remove all restrictions</h2>
@@ -124,11 +124,11 @@
 		accept="application/pdf"
 		bind:files
 	/>
-	<div class="flex mt-1">
+	<div class="mt-1 flex">
 		<Label for="password">User password (Optional)</Label>
 		<Tooltip.Root>
-			<Tooltip.Trigger class="cursor-default ml-2">
-				<Info class="w-4 h-4" />
+			<Tooltip.Trigger class="ml-2 cursor-default">
+				<Info class="h-4 w-4" />
 				<span class="sr-only">User password info</span>
 			</Tooltip.Trigger>
 			<Tooltip.Content>
@@ -140,7 +140,7 @@
 		</Tooltip.Root>
 	</div>
 	<Input id="password" type="text" placeholder="User password" bind:value={password} />
-	<Progress class="mt-1 mb-0.5" title="Progress" value={progressPrecent} />
+	<Progress class="mb-0.5 mt-1" title="Progress" value={progressPrecent} />
 	{#if !processing}
 		{#if !files?.length}
 			<Tooltip.Root>
@@ -161,7 +161,7 @@
 		</Button>
 	{/if}
 	{#if downloadUrl}
-		<a href={downloadUrl} class="w-full h-fit" download="output.pdf">
+		<a href={downloadUrl} class="h-fit w-full" download="output.pdf">
 			<Button variant="secondary" class="w-full"><Download class="mr-2 h-4 w-4" />Download</Button>
 		</a>
 	{/if}

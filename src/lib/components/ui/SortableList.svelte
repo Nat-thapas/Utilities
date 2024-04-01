@@ -52,10 +52,10 @@
 </script>
 
 {#if list?.length}
-	<ul class="list-none p-0 flex flex-col items-center">
+	<ul class="flex list-none flex-col items-center p-0">
 		{#each list as item, index (item.id)}
 			<li
-				class="border-2 border-dashed border-transparent transition-all max-w-md w-full"
+				class="w-full max-w-md border-2 border-dashed border-transparent transition-all"
 				class:over={item.id === isOver}
 				data-index={index}
 				data-id={item.id}
@@ -71,7 +71,7 @@
 		{/each}
 	</ul>
 {:else}
-	<p class="text-center my-12">No files selected</p>
+	<p class="my-12 text-center">No files selected</p>
 {/if}
 
 <style>
