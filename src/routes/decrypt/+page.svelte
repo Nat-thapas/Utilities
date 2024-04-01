@@ -109,6 +109,7 @@
 
 <svelte:head>
 	<title>Decrypt PDF</title>
+	<link rel="prefetch" href="/pdfcpu.wasm" as="fetch" />
 </svelte:head>
 
 <div class="grid w-[22rem] h-fit items-center gap-1.5 mt-4 mx-auto px-4">
